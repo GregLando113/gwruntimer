@@ -8,7 +8,8 @@ pub mod memory;
 
 static mut G_HMODULE: HMODULE = HMODULE(std::ptr::null_mut());
 
-use hudhook::*;
+use hudhook::{hudhook, ImguiRenderLoop};
+use hudhook::imgui;
 
 pub struct MyRenderLoop;
 
@@ -24,32 +25,5 @@ impl ImguiRenderLoop for MyRenderLoop {
 }
 
 
-fn initialize() {
-    use hudhook::hooks::dx9::ImguiDx9Hooks;
-    hudhook!(ImguiDx9Hooks, MyRenderLoop);
-}
-
-fn deinitialize() {
-}
-
-
-
-
-#[unsafe(no_mangle)]
-pub extern "system" fn DllMain(hmodule: HMODULE, dw_reason: u32, _lp_reserved: *const core::ffi::c_void) -> BOOL {
-    match dw_reason {
-        DLL_PROCESS_ATTACH => {
-            unsafe { G_HMODULE = hmodule; };
-            unsafe { let _ = DisableThreadLibraryCalls(hmodule); }
-            std::thread::spawn(|| {
-                initialize()
-            });
-            BOOL::from(true)
-        }
-        DLL_PROCESS_DETACH => {
-            deinitialize();
-            BOOL::from(true)
-        }
-        _ => BOOL::from(true)
-    }
-}
+use hudhook::hooks::dx9::ImguiDx9Hooks;
+hudhook::hudhook!(ImguiDx9Hooks, MyRenderLoop);
