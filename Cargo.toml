@@ -13,3 +13,7 @@ hudhook = {
         "imgui-tables-api"
     ]
 }
+rusqlite = { 
+    version = "0.40.1", 
+    features = ["bundled"] 
+}
