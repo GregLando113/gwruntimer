@@ -3,6 +3,10 @@ name = "gw-run-timer"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "kaos_zone_timer"
+crate-type = ["cdylib"]
+
 [dependencies]
 hudhook = {
     version = "0.9.1",

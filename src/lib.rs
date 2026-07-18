@@ -6,12 +6,18 @@ use windows::core::{PCSTR, PSTR};
 pub mod gw;
 pub mod memory;
 
-static mut G_HMODULE: HMODULE = HMODULE(std::ptr::null_mut());
 
 use hudhook::{hudhook, ImguiRenderLoop};
 use hudhook::imgui;
 
-pub struct MyRenderLoop;
+struct ZoneTimer {
+
+}
+
+
+struct MyRenderLoop {
+
+}
 
 impl ImguiRenderLoop for MyRenderLoop {
     fn render(&mut self, ui: &mut imgui::Ui) {
@@ -26,4 +32,4 @@ impl ImguiRenderLoop for MyRenderLoop {
 
 
 use hudhook::hooks::dx9::ImguiDx9Hooks;
-hudhook::hudhook!(ImguiDx9Hooks, MyRenderLoop);
+hudhook::hudhook!(ImguiDx9Hooks, MyRenderLoop{});
