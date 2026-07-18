@@ -21,7 +21,7 @@ pub enum MemoryError {
 
 #[derive(Clone,Copy)]
 pub struct Address {
-    addr: usize
+    pub(crate) addr: usize
 }
 
 pub type AddressResult = Result<Address,MemoryError>;
