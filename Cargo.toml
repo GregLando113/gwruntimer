@@ -1,0 +1,15 @@
+[package]
+name = "gw-run-timer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hudhook = {
+    version = "0.9.1",
+    features = [
+        "dx9",
+        "inject",
+        "imgui-freetype",
+        "imgui-tables-api"
+    ]
+}
