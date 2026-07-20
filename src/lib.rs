@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 use hudhook::ImguiRenderLoop;
 use hudhook::RenderContext;
 use hudhook::imgui::{
-    self, Condition, FontConfig, FontId, FontSource, TableColumnSetup, TableFlags, WindowFlags,
+    self, Condition, FontConfig, FontId, FontSource, StyleColor, TableColumnFlags, TableColumnSetup,
+    TableFlags, TreeNodeFlags, WindowFlags,
 };
 
 use run_log::RunEntry;
@@ -57,6 +58,8 @@ struct ZoneTimer {
     session_runs: Vec<RunEntry>,
     /// Whether the session-log window is open.
     show_log: bool,
+    /// Edit-mode state from the previous frame, for detecting enter/leave.
+    was_edit: bool,
 
     state: ZoneTimerState,
 }
@@ -71,6 +74,7 @@ impl Default for ZoneTimer {
             run_log: None,
             session_runs: Vec::new(),
             show_log: false,
+            was_edit: false,
             state: ZoneTimerState{
                 last_load_state: false,
                 mapid_before_run: 0,
@@ -132,70 +136,64 @@ impl ZoneTimer {
         }
     }
 
-    /// Draw the session-log window listing every run recorded this session.
-    fn render_log_window(&mut self, ui: &imgui::Ui) {
-        if !self.show_log {
+    /// Draw the table of runs recorded this session. Meant to be called inside
+    /// the main window, under the session-log collapsing header.
+    fn render_session_table(&self, ui: &imgui::Ui) {
+        if self.session_runs.is_empty() {
+            ui.text_disabled("No runs logged yet this session.");
             return;
         }
 
-        // The edit chord unlocks dragging and the context menu.
-        let edit = ui.io().key_ctrl && ui.io().key_shift;
-
-        let mut flags =  WindowFlags::empty();
-        if !edit {
-            // Locked: can't be moved, and lets mouse input pass through to the game.
-            flags |= WindowFlags::NO_MOVE | WindowFlags::NO_RESIZE | WindowFlags::NO_INPUTS | WindowFlags::NO_SCROLLBAR;
-        }
-
-
-        let mut open = true;
-        let mut win =  ui.window("Session Run Log")
-            .size([460.0, 300.0], Condition::FirstUseEver)
-            .flags(flags);
-            
-            if edit {
-                win = win.opened(&mut open);
+        // The time is always "MM:SS.hh", so pin that column to a constant width
+        // (its text width plus a small pad) rather than letting it size to data.
+        let time_width = ui.calc_text_size("00:00.00")[0] + 5.0;
+        let table = ui.begin_table_header_with_flags(
+            "session_runs",
+            [
+                // Under SIZING_FIXED_FIT these three size to their content.
+                TableColumnSetup{
+                    flags: TableColumnFlags::WIDTH_FIXED,
+                    init_width_or_weight: 75.0,
+                    ..TableColumnSetup::new("From")
+                },
+                
+                // Under SIZING_FIXED_FIT these three size to their content.
+                TableColumnSetup{
+                    flags: TableColumnFlags::WIDTH_FIXED,
+                    init_width_or_weight: 75.0,
+                    ..TableColumnSetup::new("Through")
+                },
+                TableColumnSetup{
+                    flags: TableColumnFlags::WIDTH_FIXED,
+                    init_width_or_weight: 75.0,
+                    ..TableColumnSetup::new("To")
+                },
+                TableColumnSetup {
+                    flags: TableColumnFlags::WIDTH_FIXED,
+                    init_width_or_weight: time_width,
+                    ..TableColumnSetup::new("Time")
+                },
+            ],
+            // Fixed-fit columns give the table a definite width, which the
+            // auto-resizing window needs (stretch columns have nothing to
+            // stretch into).
+            // TableFlags::ROW_BG | TableFlags::BORDERS |
+            TableFlags::SIZING_FIXED_FIT,
+        );
+        if let Some(_table) = table {
+            // Newest run first.
+            for run in self.session_runs.iter().rev() {
+                ui.table_next_row();
+                ui.table_next_column();
+                ui.text(run.from_map_id.to_string());
+                ui.table_next_column();
+                ui.text(run.run_map_id.to_string());
+                ui.table_next_column();
+                ui.text(run.to_map_id.to_string());
+                ui.table_next_column();
+                ui.text(format_duration(run.duration));
             }
-
-
-            win.build(|| {
-                if self.session_runs.is_empty() {
-                    ui.text_disabled("No runs logged yet this session.");
-                    return;
-                }
-
-                ui.text(format!("{} run(s) this session", self.session_runs.len()));
-                ui.separator();
-
-                let table = ui.begin_table_header_with_flags(
-                    "session_runs",
-                    [
-                        // TableColumnSetup::new("#"),
-                        TableColumnSetup::new("From"),
-                        TableColumnSetup::new("Run"),
-                        TableColumnSetup::new("To"),
-                        TableColumnSetup::new("Time"),
-                    ],
-                    TableFlags::ROW_BG | TableFlags::BORDERS | TableFlags::SIZING_STRETCH_PROP,
-                );
-                if let Some(_table) = table {
-                    // Newest run first.
-                    for (rank, run) in self.session_runs.iter().rev().enumerate() {
-                        ui.table_next_row();
-                        // ui.table_next_column();
-                        // ui.text((self.session_runs.len() - rank).to_string());
-                        ui.table_next_column();
-                        ui.text(run.from_map_id.to_string());
-                        ui.table_next_column();
-                        ui.text(run.run_map_id.to_string());
-                        ui.table_next_column();
-                        ui.text(run.to_map_id.to_string());
-                        ui.table_next_column();
-                        ui.text(format_duration(run.duration));
-                    }
-                }
-            });
-        self.show_log = open;
+        }
     }
 }
 
@@ -274,17 +272,20 @@ impl ImguiRenderLoop for ZoneTimer {
 
         // The edit chord unlocks dragging and the context menu.
         let edit = ui.io().key_ctrl && ui.io().key_shift;
+        // Detect the frame edit mode turns on/off, to grab and release focus.
+        let entered_edit = edit && !self.was_edit;
+        let left_edit = !edit && self.was_edit;
+        self.was_edit = edit;
 
-        let mut flags = WindowFlags::NO_TITLE_BAR
-            | WindowFlags::NO_RESIZE
-            | WindowFlags::NO_SCROLLBAR
+        // | WindowFlags::NO_TITLE_BAR
+        let mut flags = WindowFlags::NO_SCROLLBAR
             | WindowFlags::NO_COLLAPSE
             | WindowFlags::NO_SAVED_SETTINGS
             | WindowFlags::ALWAYS_AUTO_RESIZE;
             //| WindowFlags::NO_BACKGROUND;
         if !edit {
             // Locked: can't be moved, and lets mouse input pass through to the game.
-            flags |= WindowFlags::NO_MOVE | WindowFlags::NO_INPUTS;
+            flags |= WindowFlags::NO_RESIZE | WindowFlags::NO_MOVE | WindowFlags::NO_INPUTS;
         }
 
         // While locked, hard-pin to `self.pos` every frame. While editing, only
@@ -292,10 +293,20 @@ impl ImguiRenderLoop for ZoneTimer {
         // we read the dragged position back into `self.pos` below.
         let pos_cond = if edit { Condition::Appearing } else { Condition::Always };
 
-        ui.window("##zone_timer")
+        let mut win = ui
+            .window("KAOS' Zone Timer##zone_timer")
             .position(self.pos, pos_cond)
-            .flags(flags)
-            .build(|| {
+            // Bring the window to the front on the frame we enter edit mode;
+            // `.focused(false)` is a no-op, so this only fires on the transition.
+            .focused(entered_edit)
+            .flags(flags);
+        // When the log table is showing, hold the window to at least 300x700 so
+        // the run list has room; otherwise it auto-resizes to hug the timer.
+        if self.show_log {
+            win = win.size_constraints([300.0, 500.0], [f32::MAX, f32::MAX]);
+        }
+
+        win.build(|| {
                 let color = if self.is_running() {
                     [1.0, 1.0, 1.0, 1.0]
                 } else {
@@ -313,41 +324,45 @@ impl ImguiRenderLoop for ZoneTimer {
                     // Capture the (possibly dragged) position so it survives the
                     // switch back to the locked, position-pinned state.
                     self.pos = ui.window_pos();
+                }
 
-                    // Draw the bounding box that signals the timer is editable.
-                    let p = ui.window_pos();
-                    let s = ui.window_size();
-                    ui.get_foreground_draw_list()
-                        .add_rect(
-                            [p[0] - 4.0, p[1] - 4.0],
-                            [p[0] + s[0] + 4.0, p[1] + s[1] + 4.0],
-                            [0.3, 0.8, 1.0, 0.9],
-                        )
-                        .thickness(2.0)
-                        .rounding(3.0)
-                        .build();
+                // Session-log panel. The collapsing header is only interactive
+                // in edit mode (the window is click-through when locked). When
+                // locked and collapsed, neither the header nor the table shows.
+                if edit || self.show_log {
+                    ui.separator();
+                    // `show_log` is the source of truth: force the header's open
+                    // state from it each frame. imgui's own collapse state lives
+                    // in per-context storage that's wiped when the D3D9 device
+                    // resets (e.g. on a map change), which would otherwise make
+                    // the panel spuriously collapse. A user click still toggles:
+                    // it flips the forced value, and we read the result back.
+                    unsafe {
+                        imgui::sys::igSetNextItemOpen(self.show_log, Condition::Always as i32);
+                    }
+                    // When locked, paint the header bar the window background
+                    // color so it blends in instead of showing the accent color.
+                    let header_colors = (!edit).then(|| {
+                        let bg = ui.style_color(StyleColor::WindowBg);
+                        [
+                            ui.push_style_color(StyleColor::Header, bg),
+                            ui.push_style_color(StyleColor::HeaderHovered, bg),
+                            ui.push_style_color(StyleColor::HeaderActive, bg),
+                        ]
+                    });
+                    self.show_log = ui.collapsing_header("Session Log", TreeNodeFlags::empty());
+                    drop(header_colors);
 
-                    if let Some(_menu) = ui.begin_popup_context_window() {
-                        // let label = if self.is_running() { "Pause" } else { "Start" };
-                        // if ui.menu_item(label) {
-                        //     self.toggle();
-                        // }
-                        // if ui.menu_item("Reset") {
-                        //     self.reset();
-                        // }
-                        // ui.separator();
-                        if ui
-                            .menu_item_config("Session Log")
-                            .selected(self.show_log)
-                            .build()
-                        {
-                            self.show_log = !self.show_log;
-                        }
+                    if self.show_log {
+                        self.render_session_table(ui);
                     }
                 }
             });
 
-        self.render_log_window(ui);
+        if left_edit {
+            // Release focus back to the game when leaving edit mode.
+            unsafe { imgui::sys::igSetWindowFocus_Nil() };
+        }
     }
 }
 
