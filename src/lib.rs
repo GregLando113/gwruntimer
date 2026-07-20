@@ -1,6 +1,7 @@
-pub mod gw;
-pub mod memory;
-pub mod run_log;
+mod gw;
+mod memory;
+mod run_log;
+
 
 use run_log::RunLog;
 
@@ -177,11 +178,11 @@ impl ZoneTimer {
             for run in self.session_runs.iter().rev() {
                 ui.table_next_row();
                 ui.table_next_column();
-                ui.text(run.from_map_id.to_string());
+                ui.text(gw::mapdata::MissionConstData::get(run.from_map_id).name_id().to_string());
                 ui.table_next_column();
-                ui.text(run.run_map_id.to_string());
+                ui.text(gw::mapdata::MissionConstData::get(run.run_map_id).name_id().to_string());
                 ui.table_next_column();
-                ui.text(run.to_map_id.to_string());
+                ui.text(gw::mapdata::MissionConstData::get(run.to_map_id).name_id().to_string());
                 ui.table_next_column();
                 ui.text(format_duration(run.duration));
             }
@@ -229,8 +230,8 @@ impl ImguiRenderLoop for ZoneTimer {
 
         // timer logic
 
-        let map_data_ptr = gw::MapDataPtr::current();
-        let movement_ptr  = gw::ControlledPlayer::current();
+        let map_data_ptr = gw::MissionData::current();
+        let movement_ptr  = gw::CharControlledData::current();
 
         if map_data_ptr.is_loaded() {
             if self.state.last_load_state == false {

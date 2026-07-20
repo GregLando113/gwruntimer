@@ -2,6 +2,9 @@
 use crate::memory::{Address,ProcessModule};
 use std::{sync::LazyLock, time::Duration};
 
+pub mod mapdata;
+pub mod string;
+
 pub fn get_build_number() -> u32 {
     static GET_BUILD_NUMBER_FN: LazyLock<extern "cdecl" fn() -> u32> = LazyLock::new(|| {
         let result_fn = ProcessModule::main()
@@ -36,9 +39,9 @@ pub fn get_build_number() -> u32 {
     Address::at(ctx)
  }
 
-pub struct InstanceUpTimePtr(Address);
+pub struct InstanceUpTimeData(Address);
 
-impl InstanceUpTimePtr {
+impl InstanceUpTimeData {
 
     pub fn current() -> Self {
         Self(get_context_tls()
@@ -56,9 +59,9 @@ impl InstanceUpTimePtr {
 
 }
 
- pub struct MapDataPtr(Address);
+ pub struct MissionData(Address);
 
- impl MapDataPtr {
+ impl MissionData {
 
      pub fn current() -> Self {
         Self(get_context_tls()
@@ -90,10 +93,10 @@ impl InstanceUpTimePtr {
 
 
 
- pub struct CharDataPtr(Address);
+ pub struct MsCharData(Address);
 
 
- impl CharDataPtr {
+ impl MsCharData {
 
     pub fn current() -> Self {
         Self(get_context_tls()
@@ -123,9 +126,9 @@ impl InstanceUpTimePtr {
 
 
 
- pub struct ControlledPlayer(Address);
+ pub struct CharControlledData(Address);
 
- impl ControlledPlayer {
+ impl CharControlledData {
 
     pub fn current() -> Self {
         Self(get_context_tls()
