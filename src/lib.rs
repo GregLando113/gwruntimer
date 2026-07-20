@@ -146,19 +146,19 @@ impl ZoneTimer {
                 // Under SIZING_FIXED_FIT these three size to their content.
                 TableColumnSetup{
                     flags: TableColumnFlags::WIDTH_FIXED,
-                    init_width_or_weight: 75.0,
+                    init_width_or_weight: 175.0,
                     ..TableColumnSetup::new("From")
                 },
                 
                 // Under SIZING_FIXED_FIT these three size to their content.
                 TableColumnSetup{
                     flags: TableColumnFlags::WIDTH_FIXED,
-                    init_width_or_weight: 75.0,
+                    init_width_or_weight: 175.0,
                     ..TableColumnSetup::new("Through")
                 },
                 TableColumnSetup{
                     flags: TableColumnFlags::WIDTH_FIXED,
-                    init_width_or_weight: 75.0,
+                    init_width_or_weight: 175.0,
                     ..TableColumnSetup::new("To")
                 },
                 TableColumnSetup {
@@ -178,16 +178,22 @@ impl ZoneTimer {
             for run in self.session_runs.iter().rev() {
                 ui.table_next_row();
                 ui.table_next_column();
-                ui.text(gw::mapdata::MissionConstData::get(run.from_map_id).name_id().to_string());
+                ui.text(map_name_or_id(run.from_map_id));
                 ui.table_next_column();
-                ui.text(gw::mapdata::MissionConstData::get(run.run_map_id).name_id().to_string());
+                ui.text(map_name_or_id(run.run_map_id));
                 ui.table_next_column();
-                ui.text(gw::mapdata::MissionConstData::get(run.to_map_id).name_id().to_string());
+                ui.text(map_name_or_id(run.to_map_id));
                 ui.table_next_column();
                 ui.text(format_duration(run.duration));
             }
         }
     }
+}
+
+/// Display string for a map: its decoded name if available, otherwise the
+/// numeric id as a fallback while the async decode is still in flight.
+fn map_name_or_id(mapid: u32) -> String {
+    gw::mapdata::map_name(mapid).unwrap_or_else(|| mapid.to_string())
 }
 
 /// Format a duration as `MM:SS.d` with tenth-of-a-second precision.
@@ -296,7 +302,7 @@ impl ImguiRenderLoop for ZoneTimer {
         // When the log table is showing, hold the window to at least 300x700 so
         // the run list has room; otherwise it auto-resizes to hug the timer.
         if self.show_log {
-            win = win.size_constraints([300.0, 500.0], [f32::MAX, f32::MAX]);
+            win = win.size_constraints([600.0, 400.0], [f32::MAX, f32::MAX]);
         }
 
         win.build(|| {

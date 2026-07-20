@@ -47,7 +47,7 @@ struct DecodeCtx {
     callback: fn(arg: usize, decoded: String),
 }
 
-fn decode_string_async(
+pub fn decode_string_async(
     enc_string: &Vec<u16>,
     callback: fn(arg: usize, decoded: String),
     arg: usize,
