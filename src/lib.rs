@@ -29,6 +29,14 @@ struct SyncFont(FontId);
 unsafe impl Send for SyncFont {}
 unsafe impl Sync for SyncFont {}
 
+
+struct ZoneTimerState {
+    last_load_state: bool,
+    mapid_before_run: u32,
+    mapid_during_run: u32,
+    mapid_now: u32
+}
+
 /// A stopwatch-style overlay timer.
 ///
 /// It sits on top of the game as a borderless, click-through readout. Holding
@@ -49,6 +57,8 @@ struct ZoneTimer {
     session_runs: Vec<RunEntry>,
     /// Whether the session-log window is open.
     show_log: bool,
+
+    state: ZoneTimerState,
 }
 
 impl Default for ZoneTimer {
@@ -61,6 +71,12 @@ impl Default for ZoneTimer {
             run_log: None,
             session_runs: Vec::new(),
             show_log: false,
+            state: ZoneTimerState{
+                last_load_state: false,
+                mapid_before_run: 0,
+                mapid_during_run: 0,
+                mapid_now: 0
+            }
         }
     }
 }
@@ -143,7 +159,6 @@ impl ZoneTimer {
 
 
             win.build(|| {
-                ui.text(format!("ctx ptr: {:X}", gw::get_context_tls().value()));
                 if self.session_runs.is_empty() {
                     ui.text_disabled("No runs logged yet this session.");
                     return;
@@ -155,7 +170,7 @@ impl ZoneTimer {
                 let table = ui.begin_table_header_with_flags(
                     "session_runs",
                     [
-                        TableColumnSetup::new("#"),
+                        // TableColumnSetup::new("#"),
                         TableColumnSetup::new("From"),
                         TableColumnSetup::new("Run"),
                         TableColumnSetup::new("To"),
@@ -167,8 +182,8 @@ impl ZoneTimer {
                     // Newest run first.
                     for (rank, run) in self.session_runs.iter().rev().enumerate() {
                         ui.table_next_row();
-                        ui.table_next_column();
-                        ui.text((self.session_runs.len() - rank).to_string());
+                        // ui.table_next_column();
+                        // ui.text((self.session_runs.len() - rank).to_string());
                         ui.table_next_column();
                         ui.text(run.from_map_id.to_string());
                         ui.table_next_column();
@@ -191,7 +206,7 @@ fn format_duration(d: Duration) -> String {
     let secs_total = hundos_total / 100;
     let seconds = secs_total % 60;
     let minutes = secs_total / 60;
-    format!("{minutes:02}:{seconds:02}.{hundos}")
+    format!("{minutes:02}:{seconds:02}.{hundos:02}")
 }
 
 impl ImguiRenderLoop for ZoneTimer {
@@ -220,6 +235,43 @@ impl ImguiRenderLoop for ZoneTimer {
     }
 
     fn render(&mut self, ui: &mut imgui::Ui) {
+
+
+        // timer logic
+
+        let map_data_ptr = gw::get_map_data_ptr();
+        let movement_ptr  = gw::get_controlled_player();
+
+        if map_data_ptr.is_loaded() {
+            if self.state.last_load_state == false {
+                let cur_map_id = map_data_ptr.map_id();
+                self.state.mapid_before_run = self.state.mapid_during_run;
+                self.state.mapid_during_run = self.state.mapid_now;
+                self.state.mapid_now = cur_map_id;
+                if !self.elapsed().is_zero() {
+                    self.record_run(
+                        self.state.mapid_before_run, 
+                        self.state.mapid_during_run,
+                        self.state.mapid_now, 
+                    self.elapsed());
+                    self.reset();
+                }
+            }
+            if map_data_ptr.is_explorable() {
+                if !self.is_running() && movement_ptr.is_moving() {
+                    self.start();
+                }
+            }
+        }
+        else {
+            if self.is_running() {
+                self.pause();
+            }
+        }
+        self.state.last_load_state = map_data_ptr.is_loaded();
+
+
+
         // The edit chord unlocks dragging and the context menu.
         let edit = ui.io().key_ctrl && ui.io().key_shift;
 
@@ -276,14 +328,14 @@ impl ImguiRenderLoop for ZoneTimer {
                         .build();
 
                     if let Some(_menu) = ui.begin_popup_context_window() {
-                        let label = if self.is_running() { "Pause" } else { "Start" };
-                        if ui.menu_item(label) {
-                            self.toggle();
-                        }
-                        if ui.menu_item("Reset") {
-                            self.reset();
-                        }
-                        ui.separator();
+                        // let label = if self.is_running() { "Pause" } else { "Start" };
+                        // if ui.menu_item(label) {
+                        //     self.toggle();
+                        // }
+                        // if ui.menu_item("Reset") {
+                        //     self.reset();
+                        // }
+                        // ui.separator();
                         if ui
                             .menu_item_config("Session Log")
                             .selected(self.show_log)

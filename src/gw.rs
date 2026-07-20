@@ -2,7 +2,7 @@
 use rusqlite::Map;
 
 use crate::memory::{Address,ProcessModule};
-use std::{ops::Add, sync::LazyLock, time::Duration};
+use std::{sync::LazyLock, time::Duration};
 
 static GET_BUILD_NUMBER_FN: LazyLock<extern "cdecl" fn() -> u32> = LazyLock::new( || {
     let result_fn = ProcessModule::main()
