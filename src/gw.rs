@@ -1,6 +1,4 @@
 
-use rusqlite::Map;
-
 use crate::memory::{Address,ProcessModule};
 use std::{sync::LazyLock, time::Duration};
 
@@ -35,7 +33,7 @@ pub fn get_build_number() -> u32 {
             options(nostack, readonly, preserves_flags),
         );
     }
-    Address { addr: ctx }
+    Address::at(ctx)
  }
 
 pub struct InstanceUpTimePtr(Address);

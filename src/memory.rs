@@ -2,7 +2,6 @@
 use windows::Win32::System::Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory};
 use windows::Win32::System::Threading::GetCurrentProcess;
 
-use tracing::{info,debug};
 use std::ops::{Add, Sub};
 
 
@@ -20,53 +19,51 @@ pub enum MemoryError {
 
 
 #[derive(Clone,Copy)]
-pub struct Address {
-    pub(crate) addr: usize
-}
+pub struct Address(usize);
 
 pub type AddressResult = Result<Address,MemoryError>;
 
 
 impl Address {
     
-    pub fn at(addr: usize) -> Self { Self{ addr } }
+    pub fn at(addr: usize) -> Self { Self(addr) }
 
-    pub fn value(&self) -> usize { self.addr }
+    pub fn value(&self) -> usize { self.0 }
 
     pub fn add(self, rhs: usize) -> Self {
-        Self { addr: self.addr + rhs }
+        Self(self.0 + rhs)
     }
-    
+
     pub fn sub(self, rhs: usize) -> Self {
-        Self { addr: self.addr - rhs }
+        Self(self.0 - rhs)
     }
 
     pub fn add_addr(&self, offset: Self) -> Self {
-        Self {addr: self.addr + offset.addr}
+        Self(self.0 + offset.0)
     }
 
     pub fn sub_addr(&self, offset: Self) -> Self {
-        Self {addr: self.addr - offset.addr}
+        Self(self.0 - offset.0)
     }
 
     pub unsafe fn deref(&self) -> Self {
-       Self{ addr: unsafe { std::ptr::read(self.addr as *const usize) } }
+       Self(unsafe { std::ptr::read(self.0 as *const usize) })
     }
 
     pub unsafe fn as_ref<'a, T>(&self) -> &'a T {
-       unsafe { &*(self.addr as *const T) }
+       unsafe { &*(self.0 as *const T) }
     }
 
     pub unsafe fn as_mut_ref<'a, T>(&self) -> &'a mut T {
-       unsafe { &mut *(self.addr as *mut T) }
+       unsafe { &mut *(self.0 as *mut T) }
     }
 
     pub unsafe fn read<T: Copy>(&self) -> T {
-        unsafe { std::ptr::read(self.addr as *const T) }
+        unsafe { std::ptr::read(self.0 as *const T) }
     }
 
     pub unsafe fn write<T>(&self, value: T) {
-        unsafe { std::ptr::write(self.addr as *mut T, value) };
+        unsafe { std::ptr::write(self.0 as *mut T, value) };
     }
 
     // Ensure the deref will be without exception at additional syscall cost
@@ -78,7 +75,7 @@ impl Address {
 
             let result = ReadProcessMemory(
                 GetCurrentProcess(),
-                self.addr as *const core::ffi::c_void,
+                self.0 as *const core::ffi::c_void,
                 &mut value as *mut T as *mut core::ffi::c_void,
                 std::mem::size_of::<T>(),
                 Some(&mut bytes_read),
@@ -102,7 +99,7 @@ impl Address {
 
             let result = WriteProcessMemory(
                 GetCurrentProcess(),
-                self.addr as *const core::ffi::c_void,
+                self.0 as *const core::ffi::c_void,
                 &value as *const T as *const core::ffi::c_void,
                 std::mem::size_of::<T>(),
                 Some(&mut bytes_written),
@@ -125,8 +122,8 @@ impl Address {
             Some(module) => module,
             None => &ProcessModule::main()?
         };
-        if self.addr >= my_module.base_.addr 
-        && self.addr < my_module.base_.addr + my_module.size_ {
+        if self.0 >= my_module.base_.0 
+        && self.0 < my_module.base_.0 + my_module.size_ {
             Ok(())
         }
         else {
@@ -135,11 +132,11 @@ impl Address {
     }
 
     pub fn safe_deref(&self) -> Result<Self,MemoryError> {
-        Ok(Self { addr: self.safe_read::<usize>()? })
+        Ok(Self(self.safe_read::<usize>()?))
     }
 
     pub fn deref_rel(&self) -> Result<Self, MemoryError> {
-        let new_addr = Self { addr: (self.addr as isize + self.safe_read::<i32>()? as isize + 4) as usize };
+        let new_addr = Self((self.0 as isize + self.safe_read::<i32>()? as isize + 4) as usize);
         new_addr.within_module(None)?;
         Ok(new_addr)
     }
@@ -196,7 +193,7 @@ impl ProcessModule {
         let base = unsafe { Process::get_module_base(module_name)? };
         let size = unsafe { Process::get_module_size(base)? };
         
-        Ok( Self { base_: Address{addr: base}, size_: size as usize })
+        Ok( Self { base_: Address(base), size_: size as usize })
         
     }
 
@@ -238,12 +235,12 @@ impl ProcessModule {
             }
 
             if found {
-                debug!("Found address for pattern \"{}\" at {:X}", pattern, current_addr.value());
+                //debug!("Found address for pattern \"{}\" at {:X}", pattern, current_addr.value());
                 return Ok(current_addr);
             }
         }
 
-        debug!("Pattern \"{}\" not found", pattern);
+        //debug!("Pattern \"{}\" not found", pattern);
         Err(MemoryError::ScanNotFound)
     }
 

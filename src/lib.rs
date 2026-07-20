@@ -107,14 +107,6 @@ impl ZoneTimer {
         }
     }
 
-    fn toggle(&mut self) {
-        if self.is_running() {
-            self.pause();
-        } else {
-            self.start();
-        }
-    }
-
     fn reset(&mut self) {
         self.accumulated = Duration::ZERO;
         self.running_since = None;
