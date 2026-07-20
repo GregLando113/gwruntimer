@@ -226,7 +226,7 @@ impl ImguiRenderLoop for ZoneTimer {
         }]);
         self.big_font = Some(SyncFont(id));
 
-        match RunLog::open(RunLog::default_path()) {
+        match RunLog::in_memory() {
             Ok(log) => self.run_log = Some(log),
             Err(e) => tracing::error!("failed to open run log: {e}"),
         }
@@ -237,8 +237,8 @@ impl ImguiRenderLoop for ZoneTimer {
 
         // timer logic
 
-        let map_data_ptr = gw::get_map_data_ptr();
-        let movement_ptr  = gw::get_controlled_player();
+        let map_data_ptr = gw::MapDataPtr::current();
+        let movement_ptr  = gw::ControlledPlayer::current();
 
         if map_data_ptr.is_loaded() {
             if self.state.last_load_state == false {

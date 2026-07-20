@@ -39,14 +39,18 @@ pub fn get_build_number() -> u32 {
     Address { addr: ctx }
  }
 
-pub struct InstanceUpTimePtr {
-    pp : Address
-}
+pub struct InstanceUpTimePtr(Address);
 
 impl InstanceUpTimePtr {
 
+    pub fn current() -> Self {
+        Self(get_context_tls()
+        .add(0x8).safe_deref().expect("AgentCtx is null")
+        .add(0x1A8))
+    }
+
      pub fn get_raw(&self) -> u32 {
-        unsafe { self.pp.read::<u32>() }
+        unsafe { self.0.read::<u32>() }
     }
 
     pub fn get(&self) -> Duration {
@@ -55,20 +59,18 @@ impl InstanceUpTimePtr {
 
 }
 
- pub fn get_instance_up_time_ptr() -> InstanceUpTimePtr {
-    InstanceUpTimePtr { pp: get_context_tls()
-    .add(0x8).safe_deref().expect("AgentCtx is null")
-    .add(0x1A8) }
- }
-
- pub struct MapDataPtr {
-    pp : Address
- }
+ pub struct MapDataPtr(Address);
 
  impl MapDataPtr {
 
+     pub fn current() -> Self {
+        Self(get_context_tls()
+        .add(0x44).safe_deref().expect("MissionCtx is null")
+        .add(0x190))
+    }
+
     pub fn load_state(&self) -> u32 {
-        unsafe { self.pp.read::<u32>() }
+        unsafe { self.0.read::<u32>() }
     }
 
     pub fn is_loaded(&self) -> bool {
@@ -76,61 +78,66 @@ impl InstanceUpTimePtr {
     }
 
     pub fn map_id(&self) -> u32 {
-        unsafe { self.pp.add(0x8).read::<u32>() }
+        unsafe { self.0.add(0x8).read::<u32>() }
     }
 
-    
+
     pub fn is_explorable(&self) -> bool {
-        unsafe { self.pp.add(0xC).read::<u32>() != 0 }
+        unsafe { self.0.add(0xC).read::<u32>() != 0 }
     }
 
  }
 
 
- pub fn get_map_data_ptr() -> MapDataPtr {
-    MapDataPtr { pp: get_context_tls()
-    .add(0x44).safe_deref().expect("MissionCtx is null")
-    .add(0x190) }
- }
 
 
 
- pub struct CharDataPtr {
-    pp: Address
- }
+
+ pub struct CharDataPtr(Address);
 
 
  impl CharDataPtr {
 
+    pub fn current() -> Self {
+        Self(get_context_tls()
+        .add(0x44).safe_deref().expect("MissionCtx is null")
+        .add(0x64))
+    }
+
     pub fn uuid(&self) -> [u8; 16] {
-        let data: [u8; 16] = unsafe { self.pp.read() };
+        let data: [u8; 16] = unsafe { self.0.read() };
         data
     }
 
     pub fn name(&self) -> String {
-        let data: [u8; 40] = unsafe { self.pp.add(16).read() };
-        String::from_utf16le(&data).expect("error getting charname :/")
+        let data: [u8; 40] = unsafe { self.0.add(16).read() };
+        let units: Vec<u16> = data
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .take_while(|&u| u != 0)
+            .collect();
+        String::from_utf16_lossy(&units)
     }
-    
- }
 
- 
- 
-pub fn get_char_data_ptr() -> CharDataPtr {
-    CharDataPtr { pp: get_context_tls()
-    .add(0x44).safe_deref().expect("MissionCtx is null")
-    .add(0x64) }
  }
 
 
- pub struct ControlledPlayer {
-    pp: Address
- }
+
+
+
+
+ pub struct ControlledPlayer(Address);
 
  impl ControlledPlayer {
 
+    pub fn current() -> Self {
+        Self(get_context_tls()
+        .add(0x2c).safe_deref().expect("CharCtx is null")
+        .add(0x680))
+    }
+
     pub fn deref(&self) -> Address {
-        self.pp.safe_deref().expect("ControlledPlayer pp nil")
+        self.0.safe_deref().expect("ControlledPlayer pp nil")
     }
      
     pub fn agent_id(&self) -> u32 {
@@ -142,8 +149,3 @@ pub fn get_char_data_ptr() -> CharDataPtr {
     }
  }
 
- pub fn get_controlled_player() -> ControlledPlayer {
-    ControlledPlayer { pp: get_context_tls()
-    .add(0x2c).safe_deref().expect("CharCtx is null")
-    .add(0x680) }
- }
