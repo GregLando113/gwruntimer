@@ -2,6 +2,17 @@
 use crate::memory::{Address,ProcessModule};
 use std::sync::LazyLock;
 
+static DECODE_STRING_ASYNC_FUNC: LazyLock<
+    extern "cdecl" fn(*const u16, extern "cdecl" fn(usize, *const u16), usize),
+> = LazyLock::new(|| {
+    let result_fn = ProcessModule::main()
+        .expect("Cant get main module.")
+        .find_pattern("0f b7 07 25 ff 7f ff ff 3d 00 01 00 00 73 14")
+        .expect("decode_string_async signature not found")
+        .sub(0x3c8f79 - 0x3c8f40);
+    unsafe { std::mem::transmute(result_fn.value()) }
+});
+
 pub fn int_to_enc_string(num: u32) -> Vec<u16> {
     // Each word holds a base-BASE digit offset by WORD_VALUE_BASE. Non-final
     // words also set WORD_BIT_MORE to mark that more words follow. BASE is the
@@ -52,16 +63,7 @@ pub fn decode_string_async(
     callback: fn(arg: usize, decoded: String),
     arg: usize,
 ) {
-    static FUNC: LazyLock<
-        extern "cdecl" fn(*const u16, extern "cdecl" fn(usize, *const u16), usize),
-    > = LazyLock::new(|| {
-        let result_fn = ProcessModule::main()
-            .expect("Cant get main module.")
-            .find_pattern("0f b7 07 25 ff 7f ff ff 3d 00 01 00 00 73 14")
-            .expect("decode_string_async signature not found")
-            .sub(0x3c8f79 - 0x3c8f40);
-        unsafe { std::mem::transmute(result_fn.value()) }
-    });
+
 
     // Hand ownership of the context to C as a raw integer.
     let ctx = Box::new(DecodeCtx { arg, callback });
@@ -90,5 +92,5 @@ pub fn decode_string_async(
         // `ctx` (the Box) drops here → the DecodeCtx is freed.
     }
 
-    FUNC(enc_string.as_ptr(), cb_mapper, ctx_ptr);
+    DECODE_STRING_ASYNC_FUNC(enc_string.as_ptr(), cb_mapper, ctx_ptr);
 }

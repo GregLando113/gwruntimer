@@ -276,15 +276,17 @@ impl ImguiRenderLoop for ZoneTimer {
         let left_edit = !edit && self.was_edit;
         self.was_edit = edit;
 
-        // | WindowFlags::NO_TITLE_BAR
         let mut flags = WindowFlags::NO_SCROLLBAR
             | WindowFlags::NO_COLLAPSE
             | WindowFlags::NO_SAVED_SETTINGS
             | WindowFlags::ALWAYS_AUTO_RESIZE;
-            //| WindowFlags::NO_BACKGROUND;
         if !edit {
             // Locked: can't be moved, and lets mouse input pass through to the game.
             flags |= WindowFlags::NO_RESIZE | WindowFlags::NO_MOVE | WindowFlags::NO_INPUTS;
+
+            if !self.show_log {
+                flags |= WindowFlags::NO_TITLE_BAR;
+            }
         }
 
         // While locked, hard-pin to `self.pos` every frame. While editing, only
@@ -354,6 +356,25 @@ impl ImguiRenderLoop for ZoneTimer {
 
                     if self.show_log {
                         self.render_session_table(ui);
+                    }
+                }
+
+                if edit {
+                    if let Some(_menu) = ui.begin_popup_context_window() {
+                        
+                         if ui
+                            .menu_item_config("Clear Log")
+                            .build()
+                        {
+                            self.session_runs.clear();
+                        }
+
+                        if ui
+                            .menu_item_config("Exit Timer (WIP)")
+                            .build()
+                        {
+                            // to be implemented
+                        }
                     }
                 }
             });

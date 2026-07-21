@@ -208,40 +208,56 @@ impl ProcessModule {
             return Err(MemoryError::ScanNotFound);
         }
 
-        let scan_size = self.size_ - pattern_bytes.len() + 1;
+        // Snapshot the whole module in one syscall, then scan the local copy.
+        // The previous version did a `ReadProcessMemory` per byte (millions of
+        // syscalls over a multi-MB module), which froze the calling thread for
+        // seconds. One bulk read plus an in-memory compare is orders of
+        // magnitude faster while keeping the read exception-safe.
+        let buf = self.read_bytes(self.size_)?;
+        if buf.len() < pattern_bytes.len() {
+            return Err(MemoryError::ScanNotFound);
+        }
 
+        let scan_size = buf.len() - pattern_bytes.len() + 1;
         for i in 0..scan_size {
-            let current_addr = self.base_.add(i);
-
-            let mut found = true;
-            for (j, &pattern_byte) in pattern_bytes.iter().enumerate() {
-                if !mask[j] {
-                    continue;
-                }
-
-                let addr = current_addr.add(j);
-                match addr.safe_read::<u8>() {
-                    Ok(byte) => {
-                        if byte != pattern_byte {
-                            found = false;
-                            break;
-                        }
-                    }
-                    Err(_) => {
-                        found = false;
-                        break;
-                    }
-                }
-            }
-
-            if found {
-                //debug!("Found address for pattern \"{}\" at {:X}", pattern, current_addr.value());
-                return Ok(current_addr);
+            let window = &buf[i..i + pattern_bytes.len()];
+            let matches = pattern_bytes
+                .iter()
+                .zip(&mask)
+                .zip(window)
+                .all(|((&pb, &m), &b)| !m || b == pb);
+            if matches {
+                return Ok(self.base_.add(i));
             }
         }
 
-        //debug!("Pattern \"{}\" not found", pattern);
         Err(MemoryError::ScanNotFound)
+    }
+
+    /// Read up to `len` bytes from the module base into a local buffer with a
+    /// single `ReadProcessMemory`. If the range crosses an unreadable page the
+    /// read stops there; the returned buffer is truncated to what was read.
+    fn read_bytes(&self, len: usize) -> Result<Vec<u8>, MemoryError> {
+        let mut buf = vec![0u8; len];
+        let mut bytes_read = 0usize;
+        unsafe {
+            let result = ReadProcessMemory(
+                GetCurrentProcess(),
+                self.base_.0 as *const core::ffi::c_void,
+                buf.as_mut_ptr() as *mut core::ffi::c_void,
+                len,
+                Some(&mut bytes_read),
+            );
+            // A partial read still succeeds for our purposes: scan what we got.
+            // Only a zero-byte read is a hard failure.
+            if result.is_err() && bytes_read == 0 {
+                return Err(MemoryError::ReadFailed(
+                    windows::Win32::Foundation::GetLastError().0,
+                ));
+            }
+        }
+        buf.truncate(bytes_read);
+        Ok(buf)
     }
 
     fn parse_pattern(pattern: &str) -> (Vec<u8>, Vec<bool>) {
