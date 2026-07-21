@@ -261,9 +261,6 @@ impl ImguiRenderLoop for ZoneTimer {
 
     fn render(&mut self, ui: &mut imgui::Ui) {
 
-
-        render_debug_map_names(ui);
-
         // timer logic
 
         let map_data_ptr = gw::MissionData::current();
@@ -400,10 +397,10 @@ impl ImguiRenderLoop for ZoneTimer {
                         }
 
                         if ui
-                            .menu_item_config("Exit Timer (WIP)")
+                            .menu_item_config("Exit Timer")
                             .build()
                         {
-                            // to be implemented
+                            hudhook::eject();
                         }
                     }
                 }
