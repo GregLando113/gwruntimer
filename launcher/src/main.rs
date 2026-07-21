@@ -49,7 +49,26 @@ pub struct LauncherApp {
 
 impl LauncherApp {
     fn on_init(&self) {
+        self.make_topmost();
         self.refresh();
+    }
+
+    /// Pin the window above all non-topmost windows so it behaves like a popup
+    /// dialog. TOPMOST is a `WS_EX_*` extended style that nwg's `flags` don't
+    /// expose, so we apply it directly once the HWND exists.
+    fn make_topmost(&self) {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SetWindowPos,
+        };
+
+        let Some(hwnd) = self.window.handle.hwnd() else {
+            return;
+        };
+        let hwnd = HWND(hwnd as *mut core::ffi::c_void);
+        unsafe {
+            let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        }
     }
 
     fn on_refresh(&self) {
