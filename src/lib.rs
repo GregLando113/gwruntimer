@@ -3,6 +3,7 @@ mod memory;
 mod run_log;
 
 
+use hudhook::imgui::draw_list::Triangle;
 use run_log::RunLog;
 
 
@@ -206,6 +207,30 @@ fn format_duration(d: Duration) -> String {
     format!("{minutes:02}:{seconds:02}.{hundos:02}")
 }
 
+fn render_debug_map_names(ui: &mut imgui::Ui) {
+    ui.window("Debug Map Names")
+    .always_vertical_scrollbar(true)
+    .build(|| {
+        let table = ui.begin_table_header_with_flags(
+            "debug_map_data",
+            [
+                TableColumnSetup::new("MapID"),
+                TableColumnSetup::new("Map Name"),
+            ], 
+            TableFlags::empty()
+        );
+        if let Some(_table) = table {
+            for i in 1..0x378 {
+                ui.table_next_row();
+                ui.table_next_column();
+                ui.text(i.to_string());
+                ui.table_next_column();
+                ui.text(map_name_or_id(i));
+            }
+        }
+    });
+}
+
 impl ImguiRenderLoop for ZoneTimer {
     fn initialize<'a>(&'a mut self, ctx: &mut imgui::Context, _rc: &'a mut dyn RenderContext) {
         let fonts = ctx.fonts();
@@ -231,8 +256,13 @@ impl ImguiRenderLoop for ZoneTimer {
         }
     }
 
+
+
+
     fn render(&mut self, ui: &mut imgui::Ui) {
 
+
+        render_debug_map_names(ui);
 
         // timer logic
 

@@ -17,7 +17,7 @@ impl MissionConstData {
         static FUNC: LazyLock<extern "cdecl" fn(u32) -> usize> = LazyLock::new(|| {
             let result_fn = ProcessModule::main()
                 .expect("Cant get main module.")
-                .find_pattern("55 8B EC 56 8B 75 08 81 FE 75 03 00 00")
+                .find_pattern("55 8B EC 56 8B 75 08 81 FE 78 03 00 00")
                 .expect("MissionConstData::get signature not found");
             unsafe { std::mem::transmute(result_fn.value()) }
         });
